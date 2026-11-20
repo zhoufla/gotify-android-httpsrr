@@ -23,6 +23,9 @@ import coil.request.Options
 import coil.request.SuccessResult
 import com.github.gotify.api.CertUtils
 import com.github.gotify.client.model.Application
+import com.github.gotify.dns.ConnectionUrl
+import com.github.gotify.dns.HostResolverProvider
+import com.github.gotify.dns.enableHttpsDns
 import java.io.IOException
 import okhttp3.Credentials
 import okhttp3.Interceptor
@@ -31,7 +34,9 @@ import okhttp3.Response
 import org.tinylog.kotlin.Logger
 
 object CoilInstance {
-    private var holder: Pair<SSLSettings, ImageLoader>? = null
+    private data class LoaderKey(val sslSettings: SSLSettings, val baseUrl: String)
+
+    private var holder: Pair<LoaderKey, ImageLoader>? = null
 
     @Throws(IOException::class)
     fun getImageFromUrl(
@@ -78,22 +83,24 @@ object CoilInstance {
 
     @Synchronized
     fun get(context: Context): ImageLoader {
-        val newSettings = Settings(context).sslSettings()
+        val settings = Settings(context)
+        val key = LoaderKey(settings.sslSettings(), settings.url)
         val copy = holder
-        if (copy != null && copy.first == newSettings) {
+        if (copy != null && copy.first == key) {
             return copy.second
         }
-        return makeImageLoader(context, newSettings).also { holder = it }.second
+        return makeImageLoader(context, key).also { holder = it }.second
     }
 
-    private fun makeImageLoader(
-        context: Context,
-        sslSettings: SSLSettings
-    ): Pair<SSLSettings, ImageLoader> {
+    private fun makeImageLoader(context: Context, key: LoaderKey): Pair<LoaderKey, ImageLoader> {
         val builder = OkHttpClient
             .Builder()
             .addInterceptor(BasicAuthInterceptor())
-        CertUtils.applySslSettings(builder, sslSettings)
+        CertUtils.applySslSettings(builder, key.sslSettings)
+        val connectionUrl = ConnectionUrl.parse(key.baseUrl)
+        if (connectionUrl != null) {
+            builder.enableHttpsDns(connectionUrl, HostResolverProvider.get())
+        }
         val loader = ImageLoader.Builder(context)
             .okHttpClient(builder.build())
             .diskCache {
@@ -106,7 +113,7 @@ object CoilInstance {
                 add(DataDecoderFactory())
             }
             .build()
-        return sslSettings to loader
+        return key to loader
     }
 }
 

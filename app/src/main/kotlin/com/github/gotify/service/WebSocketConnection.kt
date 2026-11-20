@@ -9,6 +9,9 @@ import com.github.gotify.SSLSettings
 import com.github.gotify.Utils
 import com.github.gotify.api.CertUtils
 import com.github.gotify.client.model.Message
+import com.github.gotify.dns.ConnectionUrl
+import com.github.gotify.dns.HostResolverProvider
+import com.github.gotify.dns.enableHttpsDns
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -16,7 +19,6 @@ import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -25,7 +27,7 @@ import okhttp3.WebSocketListener
 import org.tinylog.kotlin.Logger
 
 internal class WebSocketConnection(
-    private val baseUrl: String,
+    baseUrl: String,
     settings: SSLSettings,
     private val token: String?,
     private val alarmManager: AlarmManager,
@@ -38,6 +40,7 @@ internal class WebSocketConnection(
 
     private var alarmManagerCallback: OnAlarmListener? = null
     private var handlerCallback: Runnable? = null
+    private val connectionUrl: ConnectionUrl
     private val client: OkHttpClient
     private val reconnectHandler = Handler(Looper.getMainLooper())
     private var errorCount = 0
@@ -51,11 +54,14 @@ internal class WebSocketConnection(
     private var state: State? = null
 
     init {
+        connectionUrl = ConnectionUrl.parse(baseUrl)
+            ?: throw IllegalArgumentException("Invalid Gotify URL")
         val builder = OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .pingInterval(1, TimeUnit.MINUTES)
             .connectTimeout(10, TimeUnit.SECONDS)
         CertUtils.applySslSettings(builder, settings)
+        builder.enableHttpsDns(connectionUrl, HostResolverProvider.get())
         client = builder.build()
     }
 
@@ -90,12 +96,24 @@ internal class WebSocketConnection(
     }
 
     private fun request(): Request {
-        val url = baseUrl.toHttpUrlOrNull()!!
+        val url = connectionUrl.base
             .newBuilder()
             .addPathSegment("stream")
             .addQueryParameter("token", token)
             .build()
         return Request.Builder().url(url).get().build()
+    }
+
+    @Synchronized
+    fun onNetworkChanged() {
+        HostResolverProvider.get().clear()
+        client.connectionPool.evictAll()
+        if (state == State.Connecting) {
+            // The handshake already has fresh DNS answers; do not abort it.
+            return
+        }
+        close()
+        start()
     }
 
     @Synchronized
@@ -207,6 +225,8 @@ internal class WebSocketConnection(
             val message = response?.message ?: ""
             Logger.error(t) { "WebSocket($id): failure $code Message: $message" }
             syncExec(id) {
+                HostResolverProvider.get().invalidate(connectionUrl.base.host)
+                client.connectionPool.evictAll()
                 closed()
 
                 errorCount++

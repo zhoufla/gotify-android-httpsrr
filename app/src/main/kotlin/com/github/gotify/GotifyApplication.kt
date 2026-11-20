@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.os.Build
 import androidx.preference.PreferenceManager
 import com.github.gotify.api.CertUtils
+import com.github.gotify.dns.HostResolverProvider
 import com.github.gotify.log.LoggerHelper
 import com.github.gotify.log.UncaughtExceptionHandler
 import com.github.gotify.settings.ThemeHelper
@@ -18,6 +19,7 @@ class GotifyApplication : Application() {
         LoggerHelper.init(this)
         UncaughtExceptionHandler.registerCurrentThread()
         Logger.info("${javaClass.simpleName}: onCreate")
+        HostResolverProvider.initialize(this)
 
         val theme = PreferenceManager.getDefaultSharedPreferences(this)
             .getString(getString(R.string.setting_key_theme), getString(R.string.theme_default))!!

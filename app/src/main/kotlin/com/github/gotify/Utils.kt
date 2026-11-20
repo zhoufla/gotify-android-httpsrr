@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import coil.target.Target
 import com.github.gotify.client.JSON
+import com.github.gotify.dns.ConnectionUrl
 import com.google.android.material.snackbar.Snackbar
 import com.google.gson.Gson
 import java.net.MalformedURLException
@@ -52,7 +53,8 @@ internal object Utils {
                 if (targetUri.isAbsolute) {
                     target
                 } else {
-                    URL(URL(baseURL), target).toString()
+                    val normalizedBase = ConnectionUrl.parse(baseURL)?.base?.toString() ?: baseURL
+                    URL(URL(normalizedBase), target).toString()
                 }
             } catch (e: MalformedURLException) {
                 Logger.error(e, "Could not resolve absolute url")

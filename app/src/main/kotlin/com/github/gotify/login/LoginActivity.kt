@@ -22,6 +22,7 @@ import com.github.gotify.Utils
 import com.github.gotify.api.CertUtils
 import com.github.gotify.databinding.ActivityLoginBinding
 import com.github.gotify.databinding.ClientNameDialogBinding
+import com.github.gotify.dns.ConnectionUrl
 import com.github.gotify.init.InitializationActivity
 import com.github.gotify.log.LogsActivity
 import com.github.gotify.log.UncaughtExceptionHandler
@@ -32,7 +33,6 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.security.cert.X509Certificate
 import kotlinx.coroutines.launch
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.tinylog.kotlin.Logger
 
 internal class LoginActivity : AppCompatActivity() {
@@ -225,12 +225,12 @@ internal class LoginActivity : AppCompatActivity() {
 
     private fun doCheckUrl() {
         val url = binding.gotifyUrlEditext.text.toString().trim().trimEnd('/')
-        val parsedUrl = url.toHttpUrlOrNull()
-        if (parsedUrl == null) {
+        val connectionUrl = ConnectionUrl.parse(url)
+        if (connectionUrl == null) {
             Utils.showSnackBar(this, "Invalid URL (include http:// or https://)")
             return
         }
-        if ("http" == parsedUrl.scheme) {
+        if ("http" == connectionUrl.base.scheme) {
             showHttpWarning()
         }
         viewModel.checkUrl(url)

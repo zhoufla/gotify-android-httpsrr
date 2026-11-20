@@ -61,7 +61,7 @@ internal class WebSocketService : Service() {
             override fun onAvailable(network: Network) {
                 super.onAvailable(network)
                 Logger.info("WebSocket: Network available, reconnect if needed.")
-                connection?.start()
+                connection?.onNetworkChanged()
             }
 
             override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {

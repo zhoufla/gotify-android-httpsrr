@@ -8,6 +8,9 @@ import com.github.gotify.client.api.OidcApi
 import com.github.gotify.client.api.UserApi
 import com.github.gotify.client.auth.ApiKeyAuth
 import com.github.gotify.client.auth.HttpBasicAuth
+import com.github.gotify.dns.ConnectionUrl
+import com.github.gotify.dns.HostResolverProvider
+import com.github.gotify.dns.enableHttpsDns
 
 internal object ClientFactory {
     private fun unauthorized(
@@ -64,9 +67,12 @@ internal object ClientFactory {
         sslSettings: SSLSettings = settings.sslSettings(),
         baseUrl: String = settings.url
     ): ApiClient {
+        val connectionUrl = ConnectionUrl.parse(baseUrl)
+            ?: throw IllegalArgumentException("Invalid Gotify URL")
         val client = ApiClient(authentications)
         CertUtils.applySslSettings(client.okBuilder, sslSettings)
-        client.adapterBuilder.baseUrl("$baseUrl/")
+        client.okBuilder.enableHttpsDns(connectionUrl, HostResolverProvider.get())
+        client.adapterBuilder.baseUrl(connectionUrl.retroBaseUrl())
         return client
     }
 }

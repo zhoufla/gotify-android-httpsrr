@@ -4,10 +4,19 @@
 
 Gotify Android connects to [gotify/server](https://github.com/gotify/server) and shows push notifications on new messages.
 
+> **Fork notice**: this fork adds RFC 9460 HTTPS RR, NATMap IP4P and dynamic-port
+> support on top of Gotify Android 2.10.1. Append `:0` to the Gotify URL to use
+> the dynamic port published through DNS. See
+> [README_HTTPSRR.md](README_HTTPSRR.md) for the full feature, usage, build and
+> verification documentation (Chinese).
+
 ## Features
 
 * show push notifications on new messages
 * view and delete messages
+* resolve the Gotify server through HTTPS RR (`ipv4hint`/`ipv6hint`/port/TTL)
+* NATMap IP4P (`AAAA` encoded IPv4 + port) with the explicit `:0` URL marker
+* dynamic-port WebSocket/REST/images with automatic A/AAAA and system-DNS fallback
 
 ## Installation
 

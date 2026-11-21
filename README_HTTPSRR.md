@@ -18,6 +18,7 @@
 | IP4P（NATMap） | 从 `AAAA` 中解码 `2001::<port>:<ipv4-hi>:<ipv4-lo>`，得到真实 IPv4 地址和端口 |
 | 动态端口 | 在 URL 末尾加 `:0` 作为标记，运行时用解析到的端口改写连接目标，同时保留原始 `Host` 头 |
 | A/AAAA 回退 | HTTPS RR 不存在、格式错误或查询失败时，自动回退到普通 A/AAAA 解析 |
+| DoH 兜底 | 系统解析器对 `HTTPS` 类型返回空应答（NOERROR/NODATA 或 NXDOMAIN）时，改用阿里 DoH（`https://dns.alidns.com/dns-query`，RFC 8484 POST）重查一次 |
 | 系统解析兜底 | 自实现 DNS 查询无结果时，最后使用系统 `InetAddress` 解析 |
 | TTL 缓存 | 正缓存按记录 TTL（上限 1 小时），负缓存 30 秒，最多 64 条 LRU |
 | 网络切换 | 网络可用时清空 DNS 缓存、连接池并重建 WebSocket；失败时按主机失效缓存 |
@@ -81,6 +82,7 @@ http://gotify.example.com:0
 | `app/src/main/kotlin/com/github/gotify/dns/HostResolver.kt` | 解析编排、TTL/负缓存、锁、AliasMode、A/AAAA 回退、系统兜底 |
 | `app/src/main/kotlin/com/github/gotify/dns/Ip4p.kt` | NATMap IP4P 解码（`2001::<port16>:<ipv4>`） |
 | `app/src/main/kotlin/com/github/gotify/dns/AndroidDnsTransport.kt` | Android 10+ 使用 `DnsResolver.rawQuery` 查询任意类型 |
+| `app/src/main/kotlin/com/github/gotify/dns/DohTransport.kt` | RFC 8484 DoH 兜底：系统解析器丢弃 HTTPS 记录时改走 `dns.alidns.com` |
 | `app/src/main/kotlin/com/github/gotify/dns/HostResolverProvider.kt` | 在 `Application.onCreate` 初始化全局解析器 |
 | `app/src/main/kotlin/com/github/gotify/dns/OkHttpHostDns.kt` | OkHttp `Dns` 实现 + 动态端口拦截器 + `enableHttpsDns()` 扩展 |
 | `app/src/main/kotlin/com/github/gotify/api/ClientFactory.kt` | REST 客户端接入 HTTPS RR / 动态端口 |
@@ -96,7 +98,9 @@ DNS 查询只对当前配置的 Gotify 主机生效；图片 CDN 等其他主机
 - `minSdk 26`（Android 8.0）。HTTPS RR 依赖 Android 10（API 29）的
   `DnsResolver.rawQuery`；Android 8/9 上 HTTPS RR 不可用，会自动回退到系统解析，
   IP4P 仍可通过 `InetAddress.getAllByName` 拿到 AAAA 后解码。
-- 使用系统 DNS 作为传输，不包含 DoH/DoT，也不引入第三方 DNS 库。
+- 解析以系统 DNS 为主；仅当 `HTTPS`（type 65）查询返回空应答时，才用阿里 DoH 重查一次，
+  A/AAAA 始终走系统解析器，以保证内网分流 DNS 正常。DoH 端点硬编码为
+  `https://dns.alidns.com/dns-query`，可在 `DohTransport.DEFAULT_ENDPOINT` 修改。
 - IP4P 采用 NATMap 的编码格式，不是通用 NAT64；`2001::/32` 之外、端口为 0、
   或 IPv4 首字节为 0 的记录会被拒绝。
 - A/AAAA 查询依赖递归解析器返回的应答记录；不会自行展开额外的 CNAME 链

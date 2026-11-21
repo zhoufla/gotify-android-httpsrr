@@ -13,12 +13,12 @@ internal object HostResolverProvider {
             return
         }
         val appContext = context.applicationContext
-        val transport = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val system = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             AndroidDnsTransport(appContext)
         } else {
             SystemDnsTransport()
         }
-        resolver = HostResolver(transport)
+        resolver = HostResolver(DohFallbackTransport(system, DohTransport()))
     }
 
     fun get(): HostResolver {
